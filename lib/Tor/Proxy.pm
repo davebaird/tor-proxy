@@ -30,6 +30,20 @@ use feature qw(signatures) ;
 
 no warnings qw(experimental::signatures) ;
 
+# ===== NOTES ==================================================================
+
+# Tor flags your circuit as being 'dirty' after ten minutes and makes further
+# connections on a new one. You can change this by setting the 'MaxCircuitDirtiness'
+# torrc option.
+# - 10 minutes is plenty, I don't adjust this
+
+# To get the exit node IP, this is interesting:
+#    https://stackoverflow.com/questions/32448750/how-to-get-the-tor-exitnode-ip-with-python-and-stem
+#    BUT it works by watching while a request is made. So not much gain over asking
+#    an external site for the IP.
+
+# This seems closer: https://stackoverflow.com/questions/9777192/how-do-i-get-the-tor-exit-node-ip-address-over-the-control-port
+
 # ===== FILE GLOBALS ===========================================================
 
 # ===== ATTRIBUTES =============================================================
@@ -244,6 +258,7 @@ sub _send ( $self, $msg ) {
     $self->_debug( 3, 'Answer',  $answer ) ;
 
     return $answer if $answer =~ /250 OK/ ;
+    return $answer if $answer =~ /250\+/ ;    # multiline responses
     return ;
     }
 
