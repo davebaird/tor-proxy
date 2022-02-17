@@ -26,4 +26,14 @@
 
 # DESCRIPTION
 
-Launch Tor and get a proxy string to use in other apps on localhost
+Launch Tor and get a proxy string to use in other apps on localhost.
+
+You can safely launch as many of these things at the same time as you want, either
+from the same parent process, or after forking.
+
+When the object goes out of scope, the tor process is shut down cleanly.
+
+Each tor instance has a different endpoint. If you want to guarantee unique endpoints,
+set 'check\_unique\_ip'. This will check that all tor processes launched \*from the current
+parent process\* are unique. So it doesn't make sense to set this flag if you
+fork before launching each tor. But endpoints seem to be pretty reliably unique in any case.
