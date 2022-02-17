@@ -347,7 +347,7 @@ C<Tor::Proxy> - launch Tor and get a proxy string to use in other apps on localh
     my $proxy_str = $tp->proxy_str ;     # socks5://localhost:$port
 
     # get the news via $ip in $cc
-    my $news = qx(curl --silent --proxy $proxy_str --header "Connection: close" https://www.bbc.com/) ;
+    my $news = qx(curl --silent --proxy $proxy_str https://www.bbc.com/) ;
 
 
 =head1 DESCRIPTION
