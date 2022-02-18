@@ -4,7 +4,7 @@ package Tor::Proxy ;
 
 # https://gitweb.torproject.org/torspec.git/tree/control-spec.txt
 
-use v5.20 ;    # for signatures
+use v5.24 ;    # for postfix dereferencing
 use warnings ;
 use Carp ;
 use Data::Dumper ;
@@ -50,6 +50,7 @@ no warnings qw(experimental::signatures) ;
 has _the_socket => ( is => 'rw', isa => Maybe [ InstanceOf ['IO::Socket::INET'] ], required => 0, default => undef ) ;
 
 has debug               => ( is => 'ro',   isa => Int,  required => 1, default => 0 ) ;
+has timeout             => ( is => 'ro',   isa => Int,  required => 1, default => 20 ) ;
 has quiet               => ( is => 'ro',   isa => Bool, required => 1, default => 1 ) ;
 has check_unique_ip     => ( is => 'ro',   isa => Bool, required => 1, default => 0 ) ;
 has circuit_established => ( is => 'rw',   isa => Bool, required => 0, default => 0 ) ;
@@ -153,7 +154,7 @@ sub _build__proc ($self) {
     $self->circuit_established(1) if repeat_until {
         $self->_send_rcv_says( "GETINFO status/circuit-established" => 'circuit-established=1' )
         }
-    20 ;
+    $self->timeout ;
 
     if ( !$self->circuit_established ) {
         $tor_proc->terminate ;
@@ -292,14 +293,20 @@ sub rotate_ip ( $self, $ensure = 1, $ip = undef ) {
     return repeat_until { $self->get_endpoint_ip(10) ne $ip } 10 ;
     }
 
-
+# https://askubuntu.com/questions/941967/how-to-print-tor-external-ip-in-terminal
 sub get_endpoint_ip ($self) {
     my $proxy_str = $self->proxy_str ;
-    qx(curl --silent --proxy $proxy_str --header "Connection: close" https://ipinfo.io/ip) ;
+
+    # return qx(curl --silent --proxy $proxy_str --header "Connection: close" https://ipinfo.io/ip) ;
+
+    my $html = qx(curl --silent --proxy $proxy_str --header "Connection: close" https://check.torproject.org) ;
+
+    die "Couldn't find IP" unless $html =~ /<strong>([\d\.]+)<\/strong/ ;
+    return $1 ;
     }
 
 
-sub _get_country_ip ( $self, $ip ) {
+sub _get_country ( $self, $ip ) {
     my $cc = $self->_send_rcv("GETINFO ip-to-country/$ip") ;
 
     $cc =~ s/^$ip=// ;
@@ -311,7 +318,9 @@ sub _get_country_ip ( $self, $ip ) {
 
 
 sub get_endpoint_cc ($self) {
-    $self->_get_country_ip( $self->get_endpoint_ip ) ;
+    my $ip = $self->get_endpoint_ip ;
+    my $cc = $self->_get_country($ip) ;
+    return wantarray ? ( $cc, $ip ) : $cc ;
     }
 
 # This should only be called a maximum of once per proxy. Only checks uniqueness
@@ -322,7 +331,7 @@ sub _check_unique_ip ($self) {
     croak("No IP")             if !$ip ;
     croak("IP did not rotate") if $self->_seen($ip) ;
 
-    $self->_debug( 1, "Tor proxy at %s is connected to endpoint $ip" ) ;
+    $self->_debug( 1, sprintf "Tor proxy at %s is connected to endpoint $ip", $self->proxy_str ) ;
     }
 
 
